@@ -17,6 +17,11 @@ It automatically checks both APIs, merges the results, and gives you a single no
 - Turn devices **on/off**
 - Set **brightness** (1–100)
 - Set **RGB color** (0–255 per channel)
+- Set **color temperature (Kelvin)** when supported
+- **Sunrise mode** (5-minute warm sunrise ramp)
+  - Starts **orange/amber** using RGB (when supported)
+  - Transitions into **Kelvin sunlight** as brightness increases
+
 - CLI interface with optional device index selection
 
 ---
@@ -59,6 +64,7 @@ npm start on [index]
 npm start off [index]
 npm start brightness <1-100> [index]
 npm start color <r> <g> <b> [index]
+npm start sunrise [index]
 ```
 
 ### Examples
@@ -89,13 +95,37 @@ npm start brightness 35
 npm start brightness 35 0
 ```
 
-Set RGB color to blue for device `0`:
+Set RGB color to a warm orange for device `0`:
 
 ```bash
-npm start color 0 0 255
+npm start color 255 120 10
 # or explicitly
-npm start color 0 0 255 0
+npm start color 255 120 10 0
 ```
+
+Run sunrise mode on device `0`:
+
+```bash
+npm start sunrise
+# or explicitly
+npm start sunrise 0
+```
+
+---
+
+## Sunrise Mode Details
+
+`npm start sunrise` runs a **5-minute sunrise** with smooth transitions:
+
+- Brightness ramps up on a smooth curve (starts dim, ends bright).
+- Color begins **more sunrise-like (yellow/orange)**:
+  - The first ~35% uses an RGB amber tone (if the device supports `colorRgb`).
+
+- Then it transitions to **Kelvin “sunlight”**:
+  - Uses `colorTemperatureK` when available (OpenAPI devices commonly support 2000–9000K).
+  - Ends around **~5200K** to feel like warm morning daylight (not harsh office light).
+
+If your device does not support color temperature, the code will fall back to approximating Kelvin using RGB.
 
 ---
 
@@ -124,8 +154,8 @@ Examples:
 ```text
 src/
   goveeClient.js   # HTTP client + Legacy/OpenAPI device discovery + control methods
-  devices.js       # High-level helpers (on/off/brightness/color) for both protocols
-  index.js         # CLI entry point (argument parsing + device selection)
+  devices.js       # High-level helpers (on/off/brightness/color/temp) for both protocols
+  index.js         # CLI entry point (argument parsing + device selection + sunrise mode)
 ```
 
 ---
@@ -148,15 +178,17 @@ The helpers in `src/devices.js` automatically send the correct payload format de
 - `protocol: "legacy"` (uses `PUT /v1/devices/control`)
 - `protocol: "openapi"` (uses `POST /router/api/v1/device/control`)
 
+The CLI (`src/index.js`) chooses which control path to use based on the device’s protocol and capabilities.
+
 ---
 
 ## Notes / Limitations
 
 - **Non-commercial use only** (per Govee developer program terms).
-- Official APIs generally support core lighting controls:
-  - on/off, brightness, RGB color
+- Some capabilities are device-specific and only appear if the device reports them (especially on OpenAPI).
+- The APIs generally support core lighting controls:
+  - on/off, brightness, RGB, and sometimes color temperature
 
-- **Speaker/audio controls and app-only music modes are not available** via these APIs.
 - Some devices only appear through the **OpenAPI** endpoint — this project supports that automatically.
 
 ---
@@ -193,12 +225,20 @@ Then use an index shown in the output:
 npm start on 0
 ```
 
+### `429 Too Many Requests`
+
+You’re hitting Govee API rate limits.
+
+- Try again after a short pause.
+- Avoid spamming rapid repeated commands.
+- Sunrise mode is designed to use spaced-out steps to reduce request rate.
+
 ---
 
 ## Roadmap Ideas (Optional)
 
-- Add `--device <index>` style flags
-- Add color temperature support
+- Add flags like `--device <index>` and `--duration <minutes>` for sunrise
+- Add `sunset` mode (reverse sunrise)
 - Add blink/pulse effects
-- Build a small Express server (`/lamp/on`, `/lamp/color`)
-- Integrate with PC events (build status, notifications, etc.)
+- Build a small Express server (`/lamp/on`, `/lamp/color`, `/lamp/sunrise`)
+- Add a “capabilities” command to print a device’s supported controls

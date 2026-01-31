@@ -37,6 +37,8 @@ export class GoveeClient {
       model: d.model,
       name: d.deviceName ?? null,
       supportCmds: d.supportCmds ?? [],
+      // include properties so we can read colorTem min/max when present
+      properties: d.properties ?? null,
     }));
   }
 
@@ -51,7 +53,6 @@ export class GoveeClient {
   // ---------- New OpenAPI ----------
   async getDevicesOpenApi() {
     const data = await this.request(`${OPENAPI_BASE}/user/devices`);
-    // Different deployments return slightly different shapes; normalize:
     const list =
       data?.data ??
       data?.payload?.devices ??
@@ -86,7 +87,6 @@ export class GoveeClient {
     const a = legacy.status === "fulfilled" ? legacy.value : [];
     const b = openapi.status === "fulfilled" ? openapi.value : [];
 
-    // de-dupe by protocol+id
     const seen = new Set();
     const all = [...a, ...b].filter((d) => {
       const key = `${d.protocol}:${d.device}:${d.model ?? d.sku ?? ""}`;
